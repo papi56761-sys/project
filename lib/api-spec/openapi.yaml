@@ -1,0 +1,502 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: farms
+    description: Farm dashboard and observations
+  - name: marketplace
+    description: Verified agricultural inputs and checkout
+  - name: field-operations
+    description: Spray timing and offline-capable field tasks
+  - name: human-review
+    description: Agronomist escalation queue
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [farms]
+      summary: Get the farmer dashboard overview
+      responses:
+        "200":
+          description: Dashboard overview and recent farm activity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /intake/process:
+    post:
+      operationId: processIntake
+      tags: [farms]
+      summary: Submit a crop observation for guarded diagnosis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeInput"
+      responses:
+        "201":
+          description: Observation and diagnosis created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeResult"
+        "400":
+          description: Invalid intake data
+  /diagnoses/{diagnosisId}:
+    get:
+      operationId: getDiagnosis
+      tags: [farms]
+      summary: Get diagnosis detail
+      parameters:
+        - name: diagnosisId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Diagnosis detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Diagnosis"
+        "404":
+          description: Diagnosis not found
+  /marketplace/products:
+    get:
+      operationId: listProducts
+      tags: [marketplace]
+      summary: List currently safe and available products
+      parameters:
+        - name: crop
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: problem
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Verified marketplace products and blocked items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductCatalog"
+  /marketplace/verify-qr:
+    post:
+      operationId: verifyProductBatch
+      tags: [marketplace]
+      summary: Verify a product batch QR payload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchVerificationInput"
+      responses:
+        "200":
+          description: Batch verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchVerification"
+  /marketplace/checkout:
+    post:
+      operationId: checkoutOrder
+      tags: [marketplace]
+      summary: Place an explicitly consented demo order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutInput"
+      responses:
+        "201":
+          description: Order placed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderReceipt"
+        "422":
+          description: Order blocked by product or batch safety rules
+  /weather/spray-window:
+    get:
+      operationId: getSprayWindow
+      tags: [field-operations]
+      summary: Get a 24-hour spray suitability matrix
+      parameters:
+        - name: district
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Hourly weather windows and current advisory
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SprayWindowSummary"
+  /tasks:
+    get:
+      operationId: listFieldTasks
+      tags: [field-operations]
+      summary: List scheduled field tasks
+      responses:
+        "200":
+          description: Field task list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FieldTask"
+  /tasks/{taskId}/complete:
+    post:
+      operationId: completeFieldTask
+      tags: [field-operations]
+      summary: Mark a field task complete
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskCompletionInput"
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FieldTask"
+  /escalations:
+    get:
+      operationId: listEscalations
+      tags: [human-review]
+      summary: List open agronomist review cases
+      responses:
+        "200":
+          description: Escalation queue
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Escalation"
+  /escalations/{escalationId}/review:
+    post:
+      operationId: reviewEscalation
+      tags: [human-review]
+      summary: Record an agronomist review decision
+      parameters:
+        - name: escalationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EscalationReviewInput"
+      responses:
+        "200":
+          description: Reviewed escalation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Escalation"
+  /services:
+    get:
+      operationId: listServices
+      tags: [marketplace]
+      summary: List bookable agricultural services
+      responses:
+        "200":
+          description: Service listings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServiceListing"
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    DashboardSummary:
+      type: object
+      required: [farmName, cropName, cropStage, acres, openCases, tasksDue, mandiPrice, weatherAdvisory]
+      properties:
+        farmName: { type: string }
+        cropName: { type: string }
+        cropStage: { type: string }
+        acres: { type: number }
+        openCases: { type: integer }
+        tasksDue: { type: integer }
+        mandiPrice: { type: number }
+        weatherAdvisory: { type: string }
+        recentActivity:
+          type: array
+          items: { $ref: "#/components/schemas/ActivityItem" }
+    ActivityItem:
+      type: object
+      required: [id, label, detail, createdAt, status]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        detail: { type: string }
+        createdAt: { type: string }
+        status: { type: string }
+    IntakeInput:
+      type: object
+      required: [cropName, cropStage, symptoms, acres, language, consentToAnalyze]
+      properties:
+        cropName: { type: string, minLength: 2 }
+        cropStage: { type: string, enum: [sowing, vegetative, flowering, fruiting, harvesting] }
+        symptoms: { type: string, minLength: 5 }
+        acres: { type: number, exclusiveMinimum: 0 }
+        language: { type: string, enum: [en, hi, te, ta, mr, kn, bn] }
+        imageDataUrl: { type: string }
+        consentToAnalyze: { type: boolean, const: true }
+    IntakeResult:
+      type: object
+      required: [observationId, diagnosis, escalationCreated]
+      properties:
+        observationId: { type: string }
+        diagnosis: { $ref: "#/components/schemas/Diagnosis" }
+        escalationCreated: { type: boolean }
+    Diagnosis:
+      type: object
+      required: [id, cropName, condition, category, confidence, severity, evidence, differentials, suggestedObservations, requiresOfficerReview, provenance, safetyNote]
+      properties:
+        id: { type: string }
+        cropName: { type: string }
+        condition: { type: string }
+        category: { type: string }
+        confidence: { type: number }
+        severity: { type: string }
+        evidence:
+          type: array
+          items: { type: string }
+        differentials:
+          type: array
+          items: { $ref: "#/components/schemas/Differential" }
+        suggestedObservations:
+          type: array
+          items: { type: string }
+        requiresOfficerReview: { type: boolean }
+        provenance: { type: string }
+        safetyNote: { type: string }
+        imageDataUrl: { type: string }
+    Differential:
+      type: object
+      required: [condition, probability]
+      properties:
+        condition: { type: string }
+        probability: { type: number }
+    ProductCatalog:
+      type: object
+      required: [products, blockedProducts]
+      properties:
+        products:
+          type: array
+          items: { $ref: "#/components/schemas/Product" }
+        blockedProducts:
+          type: array
+          items: { $ref: "#/components/schemas/BlockedProduct" }
+    Product:
+      type: object
+      required: [id, name, category, activeIngredient, compatibleCrops, targetProblems, priceInr, stock, seller, batch, compatibilityScore, safetyInstructions, harvestIntervalDays]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        category: { type: string }
+        activeIngredient: { type: string }
+        compatibleCrops:
+          type: array
+          items: { type: string }
+        targetProblems:
+          type: array
+          items: { type: string }
+        priceInr: { type: number }
+        stock: { type: integer }
+        seller: { type: string }
+        sellerVerified: { type: boolean }
+        batch:
+          $ref: "#/components/schemas/ProductBatch"
+        compatibilityScore: { type: number }
+        safetyInstructions:
+          type: array
+          items: { type: string }
+        harvestIntervalDays: { type: integer }
+    ProductBatch:
+      type: object
+      required: [id, batchNumber, expiryDate, verified, recalled]
+      properties:
+        id: { type: string }
+        batchNumber: { type: string }
+        expiryDate: { type: string }
+        verified: { type: boolean }
+        recalled: { type: boolean }
+    BlockedProduct:
+      type: object
+      required: [name, reason]
+      properties:
+        name: { type: string }
+        reason: { type: string }
+    BatchVerificationInput:
+      type: object
+      required: [qrPayload]
+      properties:
+        qrPayload: { type: string, minLength: 1 }
+    BatchVerification:
+      type: object
+      required: [authentic, message, productName, batchNumber, expiryDate, sellerVerified]
+      properties:
+        authentic: { type: boolean }
+        message: { type: string }
+        productName: { type: string }
+        batchNumber: { type: string }
+        expiryDate: { type: string }
+        sellerVerified: { type: boolean }
+    CheckoutInput:
+      type: object
+      required: [items, consentToPurchase, diagnosisId, shippingDistrict, pincode]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/CartItem" }
+        consentToPurchase: { type: boolean, const: true }
+        diagnosisId: { type: string }
+        shippingDistrict: { type: string }
+        pincode: { type: string, minLength: 6, maxLength: 6 }
+        fpoDiscount: { type: boolean }
+    CartItem:
+      type: object
+      required: [productId, batchId, quantity]
+      properties:
+        productId: { type: string }
+        batchId: { type: string }
+        quantity: { type: integer, minimum: 1 }
+    OrderReceipt:
+      type: object
+      required: [id, status, totalInr, discountInr, deliveryInr, createdAt, followUpTaskId]
+      properties:
+        id: { type: string }
+        status: { type: string }
+        totalInr: { type: number }
+        discountInr: { type: number }
+        deliveryInr: { type: number }
+        createdAt: { type: string }
+        followUpTaskId: { type: string }
+    SprayWindowSummary:
+      type: object
+      required: [district, advisory, hours]
+      properties:
+        district: { type: string }
+        advisory: { type: string }
+        hours:
+          type: array
+          items: { $ref: "#/components/schemas/SprayHour" }
+    SprayHour:
+      type: object
+      required: [hour, status, windKph, rainChance, humidity, temperatureC]
+      properties:
+        hour: { type: string }
+        status: { type: string, enum: [good, caution, avoid] }
+        windKph: { type: number }
+        rainChance: { type: number }
+        humidity: { type: number }
+        temperatureC: { type: number }
+    FieldTask:
+      type: object
+      required: [id, title, description, dueDate, type, completed, offlineCreated]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        dueDate: { type: string }
+        type: { type: string }
+        completed: { type: boolean }
+        offlineCreated: { type: boolean }
+        diagnosisId: { type: ["string", "null"] }
+    TaskCompletionInput:
+      type: object
+      required: [completed]
+      properties:
+        completed: { type: boolean, const: true }
+        offlineCreated: { type: boolean }
+    Escalation:
+      type: object
+      required: [id, diagnosisId, cropName, condition, confidence, severity, status, createdAt, reason]
+      properties:
+        id: { type: string }
+        diagnosisId: { type: string }
+        cropName: { type: string }
+        condition: { type: string }
+        confidence: { type: number }
+        severity: { type: string }
+        status: { type: string }
+        createdAt: { type: string }
+        reason: { type: string }
+        officerNotes: { type: ["string", "null"] }
+    EscalationReviewInput:
+      type: object
+      required: [decision, notes]
+      properties:
+        decision: { type: string, enum: [approved, modified, rejected] }
+        notes: { type: string, minLength: 3 }
+        overrideCondition: { type: string }
+    ServiceListing:
+      type: object
+      required: [id, name, category, description, rateInr, unit, verified, availability]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        category: { type: string }
+        description: { type: string }
+        rateInr: { type: number }
+        unit: { type: string }
+        verified: { type: boolean }
+        availability: { type: string }
+

@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "KrishiSetu Nexus"
+description = "A mobile-first agricultural support platform that helps farmers turn crop questions into safer, verified field actions through multimodal intake, transparent diagnosis, local services and inputs, weather-aware tasks, and agronomist review."
+version = "1.0.0"
+id = "artifacts/krishisetu-nexus"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 26198
+
+[services.development]
+run = "pnpm --filter @workspace/krishisetu-nexus run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/krishisetu-nexus", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/krishisetu-nexus/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "26198"
+BASE_PATH = "/"
